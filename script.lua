@@ -15,7 +15,7 @@ local HttpService = game:GetService("HttpService")
 -- ============================================= --
 -- 🛠️ BEXUS CONFIGURATION — S.ID & LINK RAW ABADI --
 -- ============================================= --
-local LootlabsLink = "https://sfl.gl/DkI4"
+local LootlabsLink = "https://sfl.gl/WaSDcP"
 local KeyDatabaseURL = "https://gist.githubusercontent.com/xxxtentabokep/634999058ad4ead3175e159a85fea09d/raw/key.txt"
 -- ============================================= --
 -- ⚙️ PROSES VERIFIKASI UTAMA KRYPTON ENGINE --- --
