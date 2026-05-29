@@ -568,279 +568,309 @@ SubmitBtn.MouseButton1Click:Connect(function()
             DiscordBtn.Text = "COPY DISCORD LINK"
         end)
 
-        -- ============================================= --
-        -- ============ FOV CIRCLE GRAPHICS ============ --
-        -- ============================================= --
-        local FOVCircle = Instance.new("Frame", ScreenGui)
-        FOVCircle.Name = "FOV_Circle"
+-- ============================================= --
+-- ============ FOV CIRCLE GRAPHICS ============ --
+-- ============================================= --
+local FOVCircle = Instance.new("Frame", ScreenGui)
+FOVCircle.Name = "FOV_Circle"
+FOVCircle.Size = UDim2.new(0, _G.AimFOV * 2, 0, _G.AimFOV * 2)
+FOVCircle.Position = UDim2.new(0.5, -_G.AimFOV, 0.5, -_G.AimFOV)
+FOVCircle.BackgroundTransparency = 1
+FOVCircle.Visible = false
+
+local circleStroke = Instance.new("UIStroke", FOVCircle)
+circleStroke.Thickness = 2
+circleStroke.Color = Color3.fromRGB(255, 0, 0)
+
+local circleCorner = Instance.new("UICorner", FOVCircle)
+circleCorner.CornerRadius = UDim.new(1, 0)
+
+-- ============================================= --
+-- ============ DRAWING API CACHE ============== --
+-- ============================================= --
+local DrawCache = {}
+
+local function GetDrawVisuals(p)
+    if DrawCache[p.Name] then 
+        return DrawCache[p.Name] 
+    end
+    
+    local box = Drawing.new("Square")
+    box.Thickness = 1.5
+    box.Filled = false
+    box.Transparency = 1
+    box.Visible = false
+    
+    local line = Drawing.new("Line")
+    line.Thickness = 1.5
+    line.Transparency = 1
+    line.Visible = false
+    
+    DrawCache[p.Name] = {Box = box, Line = line}
+    return DrawCache[p.Name]
+end
+
+local function ClearDrawVisuals(p)
+    if DrawCache[p.Name] then
+        DrawCache[p.Name].Box:Remove()
+        DrawCache[p.Name].Line:Remove()
+        DrawCache[p.Name] = nil
+    end
+    if p.Character and p.Character:FindFirstChild("KryptonHighlight") then
+        p.Character.KryptonHighlight:Destroy()
+    end
+end
+
+Players.PlayerRemoving:Connect(ClearDrawVisuals)
+
+-- ============================================= --
+-- ============ TEAM DETECTOR ================== --
+-- ============================================= --
+local function IsEnemyUniversal(TargetPlayer)
+    if not TargetPlayer or TargetPlayer == LocalPlayer then 
+        return false 
+    end
+    
+    if _G.ESPMode == "FFA" then 
+        return true 
+    end
+    
+    if TargetPlayer.Team and LocalPlayer.Team then 
+        return TargetPlayer.Team ~= LocalPlayer.Team 
+    end
+    
+    if TargetPlayer.TeamColor and LocalPlayer.TeamColor then 
+        return TargetPlayer.TeamColor ~= LocalPlayer.TeamColor 
+    end
+    
+    local tChar = TargetPlayer.Character
+    if tChar and tChar:FindFirstChild("Status") and tChar.Status:FindFirstChild("Team") then
+        local tTeam = tChar.Status.Team.Value
+        local mTeam = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Status") and 
+                       LocalPlayer.Character.Status:FindFirstChild("Team") and 
+                       LocalPlayer.Character.Status.Team.Value
+        if tTeam and mTeam then 
+            return tostring(tTeam) ~= tostring(mTeam) 
+        end
+    end
+    
+    return true
+end
+
+-- ============================================= --
+-- ============ OPTIMIZED BOOSTER ENGINE ======= --
+-- ============================================= --
+local function ApplyBoosterEffects()
+    if not (_G.FPSBoost or _G.PotatoMode) then 
+        return 
+    end
+    
+    Lighting.GlobalShadows = false
+    local descendants = game:GetDescendants()
+    
+    for i, v in pairs(descendants) do
+        if i % 100 == 0 then 
+            task.wait() 
+        end
+        
+        if _G.FPSBoost then
+            if v:IsA("PostProcessEffect") or v:IsA("ParticleEmitter") or v:IsA("Smoke") then
+                v.Enabled = false
+            end
+        elseif _G.PotatoMode then
+            if v:IsA("PostProcessEffect") or v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Sparkles") then
+                v.Enabled = false
+            elseif v:IsA("BasePart") and not v:IsA("MeshPart") then
+                v.Material = Enum.Material.SmoothPlastic
+                v.Reflectance = 0
+            elseif v:IsA("Decal") or v:IsA("Texture") then
+                v.Transparency = 1
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while true do
+        if _G.FPSBoost or _G.PotatoMode then
+            ApplyBoosterEffects()
+            task.wait(5)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+game.DescendantAdded:Connect(function(v)
+    if _G.FPSBoost then
+        if v:IsA("PostProcessEffect") or v:IsA("ParticleEmitter") or v:IsA("Smoke") then
+            v.Enabled = false
+        end
+    elseif _G.PotatoMode then
+        if v:IsA("PostProcessEffect") or v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Sparkles") then
+            v.Enabled = false
+        elseif v:IsA("BasePart") and not v:IsA("MeshPart") then
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+        elseif v:IsA("Decal") or v:IsA("Texture") then
+            v.Transparency = 1
+        end
+    end
+end)
+
+-- ============================================= --
+-- ============ RENDERING ENGINE LOOP ========== --
+-- ============================================= --
+RunService.RenderStepped:Connect(function()
+    if _G.ShowFOVCircle and _G.AimbotMaster then
+        FOVCircle.Visible = true
         FOVCircle.Size = UDim2.new(0, _G.AimFOV * 2, 0, _G.AimFOV * 2)
         FOVCircle.Position = UDim2.new(0.5, -_G.AimFOV, 0.5, -_G.AimFOV)
-        FOVCircle.BackgroundTransparency = 1
-        FOVCircle.Visible = false
-
-        local circleStroke = Instance.new("UIStroke", FOVCircle)
-        circleStroke.Thickness = 2
-        circleStroke.Color = Color3.fromRGB(255, 0, 0)
-        local circleCorner = Instance.new("UICorner", FOVCircle)
-        circleCorner.CornerRadius = UDim.new(1, 0)
-
-        -- ============================================= --
-        -- ============ DRAWING API CACHE ============== --
-        -- ============================================= --
-        local DrawCache = {}
-
-        local function GetDrawVisuals(p)
-            if DrawCache[p.Name] then 
-                return DrawCache[p.Name] 
-            end
-            
-            local box = Drawing.new("Square")
-            box.Thickness = 1.5
-            box.Filled = false
-            box.Transparency = 1
-            box.Visible = false
-            
-            local line = Drawing.new("Line")
-            line.Thickness = 1.5
-            line.Transparency = 1
-            line.Visible = false
-            
-            DrawCache[p.Name] = {Box = box, Line = line}
-            return DrawCache[p.Name]
-        end
-
-        local function ClearDrawVisuals(p)
-            if DrawCache[p.Name] then
-                DrawCache[p.Name].Box:Remove()
-                DrawCache[p.Name].Line:Remove()
-                DrawCache[p.Name] = nil
-            end
-            if p.Character and p.Character:FindFirstChild("EnemyHighlight") then
-                p.Character.EnemyHighlight:Destroy()
-            end
-        end
-
-        Players.PlayerRemoving:Connect(ClearDrawVisuals)
-
-        -- ============================================= --
-        -- ============ TEAM DETECTOR ================== --
-        -- ============================================= --
-        local function IsEnemyUniversal(TargetPlayer)
-            if not TargetPlayer or TargetPlayer == LocalPlayer then 
-                return false 
-            end
-            
-            if _G.ESPMode == "FFA" then 
-                return true 
-            end
-            
-            if TargetPlayer.Team and LocalPlayer.Team then 
-                return TargetPlayer.Team ~= LocalPlayer.Team 
-            end
-            
-            if TargetPlayer.TeamColor and LocalPlayer.TeamColor then 
-                return TargetPlayer.TeamColor ~= LocalPlayer.TeamColor 
-            end
-            
-            local tChar = TargetPlayer.Character
-            if tChar and tChar:FindFirstChild("Status") and tChar.Status:FindFirstChild("Team") then
-                local tTeam = tChar.Status.Team.Value
-                local mTeam = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Status") and 
-                               LocalPlayer.Character.Status:FindFirstChild("Team") and 
-                               LocalPlayer.Character.Status.Team.Value
-                if tTeam and mTeam then 
-                    return tostring(tTeam) ~= tostring(mTeam) 
-                end
-            end
-            
-            return true
-        end
-
-        -- ============================================= --
-        -- ============ OPTIMIZED BOOSTER ENGINE ======= --
-        -- ============================================= --
-        local function ApplyBoosterEffects()
-            if not (_G.FPSBoost or _G.PotatoMode) then 
-                return 
-            end
-            
-            Lighting.GlobalShadows = false
-            local descendants = game:GetDescendants()
-            
-            for i, v in pairs(descendants) do
-                if i % 100 == 0 then 
-                    task.wait() 
-                end
-                
-                if _G.FPSBoost then
-                    if v:IsA("PostProcessEffect") or v:IsA("ParticleEmitter") or v:IsA("Smoke") then
-                        v.Enabled = false
-                    end
-                elseif _G.PotatoMode then
-                    if v:IsA("PostProcessEffect") or v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Sparkles") then
-                        v.Enabled = false
-                    elseif v:IsA("BasePart") and not v:IsA("MeshPart") then
-                        v.Material = Enum.Material.SmoothPlastic
-                        v.Reflectance = 0
-                    elseif v:IsA("Decal") or v:IsA("Texture") then
-                        v.Transparency = 1
-                    end
-                end
-            end
-        end
-
-        task.spawn(function()
-            while true do
-                if _G.FPSBoost or _G.PotatoMode then
-                    ApplyBoosterEffects()
-                    task.wait(5)
-                else
-                    task.wait(1)
-                end
-            end
-        end)
-
-        game.DescendantAdded:Connect(function(v)
-            if _G.FPSBoost then
-                if v:IsA("PostProcessEffect") or v:IsA("ParticleEmitter") or v:IsA("Smoke") then
-                    v.Enabled = false
-                end
-            elseif _G.PotatoMode then
-                if v:IsA("PostProcessEffect") or v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Sparkles") then
-                    v.Enabled = false
-                elseif v:IsA("BasePart") and not v:IsA("MeshPart") then
-                    v.Material = Enum.Material.SmoothPlastic
-                    v.Reflectance = 0
-                elseif v:IsA("Decal") or v:IsA("Texture") then
-                    v.Transparency = 1
-                end
-            end
-        end)
-
-        -- ============================================= --
-        -- ============ RENDERING ENGINE LOOP ========== --
-        -- ============================================= --
-        RunService.RenderStepped:Connect(function()
-            if _G.ShowFOVCircle and _G.AimbotMaster then
-                FOVCircle.Visible = true
-                FOVCircle.Size = UDim2.new(0, _G.AimFOV * 2, 0, _G.AimFOV * 2)
-                FOVCircle.Position = UDim2.new(0.5, -_G.AimFOV, 0.5, -_G.AimFOV)
-            else
-                FOVCircle.Visible = false
-            end
-            
-            local character = LocalPlayer.Character
-            local hrp = character and character:FindFirstChild("HumanoidRootPart")
-            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-            
-            -- FLY ENGINE & MOVEMENT
-            if hrp and humanoid then
-                if _G.Fly then
-                    hrp.Velocity = Vector3.new(0, 0, 0)
-                    local flyDirection = humanoid.MoveDirection * (_G.FlySpeed / 5)
-                    
-                    if UIS:IsKeyDown(Enum.KeyCode.Space) then
-                        flyDirection = flyDirection + Vector3.new(0, _G.FlySpeed / 5, 0)
-                    elseif UIS:IsKeyDown(Enum.KeyCode.LeftShift) then
-                        flyDirection = flyDirection - Vector3.new(0, _G.FlySpeed / 5, 0)
-                    end
-                    hrp.CFrame = hrp.CFrame + flyDirection
-                end
-                
-                if _G.SuperSpeed and humanoid.MoveDirection.Magnitude > 0 then
-                    local bypassVelocity = (_G.RunSpeed / 16) * 0.35
-                    hrp.CFrame = hrp.CFrame + (humanoid.MoveDirection * bypassVelocity)
-                end
-                
-                if _G.NoClip then
-                    for _, part in pairs(character:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            part.CanCollide = false
-                        end
-                    end
-                end
-            end
-            
-            if _G.BrightnessToggle then
-                Lighting.Brightness = 3.5
-                Lighting.Ambient = Color3.fromRGB(150, 150, 150)
-            end
-            
-            local closestTarget = nil
-            local shortestDistance = _G.AimFOV
-            local cursorPosition = Vector2.new(Mouse.X, Mouse.Y)
-            
-            for _, p in pairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer then
-                    local pChar = p.Character
-                    if pChar and pChar:FindFirstChild("Head") and pChar:FindFirstChild("HumanoidRootPart") then
-                        local head = pChar.Head
-                        local tHrp = pChar.HumanoidRootPart
-                        local isEnemy = IsEnemyUniversal(p)
-                        
-                        if _G.HitboxExpand then
-                            head.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
-                            head.Transparency = 0.5
-                            head.CanCollide = false
-                        elseif head.Size.X ~= 2 then
-                            head.Size = Vector3.new(2, 1, 1)
-                            head.Transparency = 0
-                        end
-                        
-                        local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                        if onScreen and _G.AimbotMaster and isEnemy then
-                            if _G.AimbotCursor then
-                                local distCursor = (Vector2.new(pos.X, pos.Y) - cursorPosition).Magnitude
-                                if distCursor < shortestDistance then
-                                    shortestDistance = distCursor
-                                    closestTarget = head
-                                end
-                            elseif _G.AimbotChar and hrp then
-                                local distChar = (tHrp.Position - hrp.Position).Magnitude
-                                if distChar < shortestDistance then
-                                    shortestDistance = distChar
-                                    closestTarget = head
-                                end
-                            end
-                        end
-                        
-                        if _G.ESP then
-                            local draw = GetDrawVisuals(p)
-                            local hrpPos, hrpOnScreen = Camera:WorldToViewportPoint(tHrp.Position)
-                            
-                            if hrpOnScreen then
-                                local camDist = (Camera.CFrame.Position - tHrp.Position).Magnitude
-                                local scaleWidth = math.clamp(1200 / camDist, 12, 60)
-                                local scaleHeight = scaleWidth * 1.45
-                                local drawColor = isEnemy and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 0)
-                                
-                                draw.Box.Visible = true
-                                draw.Box.Color = drawColor
-                                draw.Box.Position = Vector2.new(hrpPos.X - (scaleWidth / 2), hrpPos.Y - (scaleHeight / 2))
-                                draw.Box.Size = Vector2.new(scaleWidth, scaleHeight)
-                                draw.Line.Visible = true
-                                draw.Line.Color = drawColor
-                                draw.Line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                                draw.Line.To = Vector2.new(hrpPos.X, hrpPos.Y)
-                            else
-                                draw.Box.Visible = false
-                                draw.Line.Visible = false
-                            end
-                        end
-                    end
-                end
-            end
-            
-            if _G.AimbotMaster and closestTarget and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestTarget.Position)
-            end
-        end)
-        
     else
-        SubmitBtn.Text = "WRONG KEY! COBA LAGI"
-        SubmitBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-        task.wait(1.5)
-        SubmitBtn.Text = "CHECK KEY"
-        SubmitBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        FOVCircle.Visible = false
+    end
+    
+    local character = LocalPlayer.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    
+    -- FLY ENGINE & MOVEMENT
+    if hrp and humanoid then
+        if _G.Fly then
+            hrp.Velocity = Vector3.new(0, 0, 0)
+            
+            local cameraLook = Camera.CFrame.LookVector
+            local flyDirection = Vector3.new(0, 0, 0)
+            
+            if humanoid.MoveDirection.Magnitude > 0 then
+                local rawMove = humanoid.MoveDirection
+                local forwardVector = cameraLook.Unit
+                local rightVector = Camera.CFrame.RightVector.Unit
+                
+                flyDirection = (forwardVector * (rawMove.Z < 0 and 1 or (rawMove.Z > 0 and -1 or 0))) + 
+                               (rightVector * (rawMove.X > 0 and 1 or (rawMove.X < 0 and -1 or 0)))
+            end
+            
+            if flyDirection.Magnitude > 0 then
+                hrp.CFrame = CFrame.new(hrp.CFrame.Position, hrp.CFrame.Position + cameraLook) 
+                hrp.CFrame = hrp.CFrame + (flyDirection.Unit * (_G.FlySpeed / 25))
+            else
+                hrp.CFrame = CFrame.new(hrp.CFrame.Position, hrp.CFrame.Position + Vector3.new(cameraLook.X, 0, cameraLook.Z))
+            end
+        end
+        
+        if _G.SuperSpeed and humanoid.MoveDirection.Magnitude > 0 then
+            local bypassVelocity = (_G.RunSpeed / 16) * 0.35
+            hrp.CFrame = hrp.CFrame + (humanoid.MoveDirection * bypassVelocity)
+        end
+        
+        if _G.NoClip then
+            for _, part in pairs(character:GetChildren()) do
+                if part:IsA("BasePart") then 
+                    part.CanCollide = false 
+                elseif part:IsA("Accessory") and part:FindFirstChild("Handle") then
+                    part.Handle.CanCollide = false
+                end
+            end
+        end
+    end
+    
+    -- BRIGHTNESS MOD
+    if _G.BrightnessToggle then
+        Lighting.Brightness = 3.5
+        Lighting.Ambient = Color3.fromRGB(150, 150, 150)
+    end
+    
+    -- AIMBOT & ESP LOGIC
+    local closestTarget = nil
+    local shortestDistance = _G.AimFOV
+    local cursorPosition = Vector2.new(Mouse.X, Mouse.Y)
+    
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            local pChar = p.Character
+            if pChar and pChar:FindFirstChild("Head") and pChar:FindFirstChild("HumanoidRootPart") then
+                local head = pChar.Head
+                local tHrp = pChar.HumanoidRootPart
+                local isEnemy = IsEnemyUniversal(p)
+                
+                if _G.HitboxExpand then
+                    head.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
+                    head.Transparency = 0.5
+                    head.CanCollide = false
+                elseif head.Size.X ~= 2 then
+                    head.Size = Vector3.new(2, 1, 1)
+                    head.Transparency = 0
+                end
+                
+                local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen and _G.AimbotMaster and isEnemy then
+                    if _G.AimbotCursor then
+                        local distCursor = (Vector2.new(pos.X, pos.Y) - cursorPosition).Magnitude
+                        if distCursor < shortestDistance then
+                            shortestDistance = distCursor
+                            closestTarget = head
+                        end
+                    elseif _G.AimbotChar and hrp then
+                        local distChar = (tHrp.Position - hrp.Position).Magnitude
+                        if distChar < shortestDistance then
+                            shortestDistance = distChar
+                            closestTarget = head
+                        end
+                    end
+                end
+                
+                if _G.ESP then
+                    local draw = GetDrawVisuals(p)
+                    local hrpPos, hrpOnScreen = Camera:WorldToViewportPoint(tHrp.Position)
+                    local drawColor = isEnemy and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 0)
+                    
+                    -- BODYHIGHLIGHT ESP
+                    local hl = pChar:FindFirstChild("KryptonHighlight")
+                    if not hl then
+                        hl = Instance.new("Highlight")
+                        hl.Name = "KryptonHighlight"
+                        hl.Parent = pChar
+                    end
+                    hl.FillColor = drawColor
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    hl.FillTransparency = 0.45
+                    hl.OutlineTransparency = 0.2
+                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    hl.Enabled = true
+                    
+                    if hrpOnScreen then
+                        local camDist = (Camera.CFrame.Position - tHrp.Position).Magnitude
+                        local scaleWidth = math.clamp(1200 / camDist, 12, 60)
+                        local scaleHeight = scaleWidth * 1.45
+                        
+                        draw.Box.Visible = true
+                        draw.Box.Color = drawColor
+                        draw.Box.Position = Vector2.new(hrpPos.X - (scaleWidth / 2), hrpPos.Y - (scaleHeight / 2))
+                        draw.Box.Size = Vector2.new(scaleWidth, scaleHeight)
+                        draw.Line.Visible = true
+                        draw.Line.Color = drawColor
+                        draw.Line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                        draw.Line.To = Vector2.new(hrpPos.X, hrpPos.Y)
+                    else
+                        draw.Box.Visible = false
+                        draw.Line.Visible = false
+                    end
+                else
+                    local draw = DrawCache[p.Name]
+                    if draw then
+                        draw.Box.Visible = false
+                        draw.Line.Visible = false
+                    end
+                    if pChar:FindFirstChild("KryptonHighlight") then
+                        pChar.KryptonHighlight:Destroy()
+                    end
+                end
+            end
+        end
+    end
+    
+    if _G.AimbotMaster and closestTarget and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, closestTarget.Position)
     end
 end)
